@@ -2,7 +2,7 @@ import re
 
 field = []
 
-with open("data.txt") as ifile:
+with open("data_melvin.txt") as ifile:
     for line in ifile.readlines():
         field.append([])
         for digit in re.findall(r'\d', line):
