@@ -12,6 +12,6 @@ if [ ! -d "$DATE" ]; then
   touch $DATE/data_test2.txt
 fi
 
-nix-shell -p librewolf --run "librewolf $(nix-shell -p rustup --run "rustup doc --path --std")" 2>/dev/null &
+firefox /persist/home/vawvaw/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/share/doc/rust/html/std/index.html https://adventofcode.com/ 2>&1 >/dev/null&
 
 nvim $DATE/src/main.rs

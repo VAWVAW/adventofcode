@@ -12,6 +12,7 @@ fn main() {
     {
         "1" => (true, "data.txt"),
         "2" => (false, "data.txt"),
+        "t1" => (true, "data_test1.txt"),
         "t2" => (false, "data_test2.txt"),
         _ => (true, "data_test1.txt"),
     };
