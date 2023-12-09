@@ -1,8 +1,8 @@
 use std::fs;
 
-fn one(input: String) {}
+fn one(_input: String) {}
 
-fn two(input: String) {}
+fn two(_input: String) {}
 
 fn main() {
     let (execute_first, file_name) = match std::env::args()
