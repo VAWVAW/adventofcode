@@ -79,33 +79,20 @@ fn task_2(allocator: std.mem.Allocator, file_name: []const u8) !?i32 {
     // loop over data
     var result: i32 = 0;
 
-    for (lines.items, 0..) |line, y_start_u| {
-        for (line, 0..) |char, x_start_u| {
-            if (char != 'A')
+    var y: usize = 1;
+    while (y < lines.items.len - 1) : (y += 1) {
+        var x: usize = 1;
+        while (x < lines.items[0].len - 1) : (x += 1) {
+            if (lines.items[y][x] != 'A')
                 continue;
-            if (x_start_u == 0 or y_start_u == 0 or x_start_u == line_length or y_start_u == lines.items.len - 1) {
-                continue;
+
+            if (((lines.items[y - 1][x - 1] == 'M' and lines.items[y + 1][x + 1] == 'S') or
+                (lines.items[y + 1][x + 1] == 'M' and lines.items[y - 1][x - 1] == 'S')) and
+                ((lines.items[y - 1][x + 1] == 'M' and lines.items[y + 1][x - 1] == 'S') or
+                (lines.items[y + 1][x - 1] == 'M' and lines.items[y - 1][x + 1] == 'S')))
+            {
+                result += 1;
             }
-
-            const y_start: isize = @intCast(y_start_u);
-            const x_start: isize = @intCast(x_start_u);
-
-            var values: [2]u2 = .{ 0, 0 };
-            for (0..9) |direction| {
-                const d_x = @as(isize, @intCast(direction % 3)) - 1;
-                const d_y = @as(isize, @intCast(direction / 3)) - 1;
-
-                if (d_y == 0 or d_x == 0) {
-                    continue;
-                }
-
-                if (lines.items[@intCast(y_start + d_y)][@intCast(x_start + d_x)] == 'M' and lines.items[@intCast(y_start - d_y)][@intCast(x_start - d_x)] == 'S') {
-                    values[(@abs(d_y) + @abs(d_x)) % 2] += 1;
-                }
-            }
-
-            result += @intCast(values[0] / 2);
-            result += @intCast(values[1] / 2);
         }
     }
 
