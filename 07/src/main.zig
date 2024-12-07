@@ -47,9 +47,53 @@ fn task_1(allocator: std.mem.Allocator, file_name: []const u8) !?result_type {
 }
 
 fn task_2(allocator: std.mem.Allocator, file_name: []const u8) !?result_type {
-    _ = allocator;
-    _ = file_name;
-    return error.NotImplemented;
+    // open input
+    var file = try std.fs.cwd().openFile(file_name, .{});
+    defer file.close();
+    var input = std.io.bufferedReader(file.reader());
+
+    // read data
+
+    var result: result_type = 0;
+    var values = std.ArrayList(result_type).init(allocator);
+    defer values.deinit();
+
+    var buf: [64]u8 = undefined;
+    outer: while (try input.reader().readUntilDelimiterOrEof(&buf, '\n')) |line| : (values.clearRetainingCapacity()) {
+        var iter = std.mem.tokenizeAny(u8, line, &[_]u8{ ' ', ':' });
+
+        const expected_value: result_type = try std.fmt.parseInt(result_type, iter.next().?, 10);
+
+        while (iter.next()) |next| {
+            try values.append(try std.fmt.parseInt(result_type, next, 10));
+        }
+
+        var i: usize = 0;
+        while (i < std.math.pow(usize, 3, values.items.len - 1)) : (i += 1) {
+            var partial_value: result_type = values.items[0];
+
+            for (values.items[1..], 0..) |next, offset| {
+                switch (i / std.math.pow(usize, 3, offset) % 3) {
+                    0 => partial_value += next,
+                    1 => partial_value *= next,
+                    2 => {
+                        // concat
+                        const shift_val = std.math.pow(result_type, 10, std.math.log10(next) + 1);
+                        partial_value *= shift_val;
+                        partial_value += next;
+                    },
+                    else => unreachable,
+                }
+            }
+
+            if (partial_value == expected_value) {
+                result += @intCast(expected_value);
+                continue :outer;
+            }
+        }
+    }
+
+    return result;
 }
 
 pub fn main() !void {
@@ -80,5 +124,5 @@ test task_1 {
 }
 
 test task_2 {
-    // try std.testing.expectEqual(6, try task_2(std.testing.allocator, "data_test2.txt"));
+    try std.testing.expectEqual(11387, try task_2(std.testing.allocator, "data_test2.txt"));
 }
