@@ -66,9 +66,81 @@ fn task_1(allocator: std.mem.Allocator, file_name: []const u8) !?result_type {
 }
 
 fn task_2(allocator: std.mem.Allocator, file_name: []const u8) !?result_type {
-    _ = allocator;
-    _ = file_name;
-    return error.NotImplemented;
+    // open input
+    var file = try std.fs.cwd().openFile(file_name, .{});
+    defer file.close();
+    var input = std.io.bufferedReader(file.reader());
+
+    // read data
+    const raw_data = try input.reader().readAllAlloc(allocator, 1 << 32);
+    defer allocator.free(raw_data);
+    const data = raw_data[0 .. raw_data.len - 1 :'\n'];
+
+    var disk_size: u32 = 0;
+    for (data) |*num| {
+        num.* -= '0';
+        disk_size += num.*;
+    }
+
+    var disk = try allocator.alloc(disk_type, disk_size);
+    defer allocator.free(disk);
+
+    var disk_offset: usize = 0;
+    for (data, 0..) |num, i| {
+        for (0..num) |_| {
+            if (i % 2 == 1) {
+                disk[disk_offset] = null;
+            } else {
+                disk[disk_offset] = @intCast(i / 2);
+            }
+
+            disk_offset += 1;
+        }
+    }
+
+    // calculate result
+    var offset_right: isize = @intCast(disk.len - 1);
+
+    while (offset_right >= 0) : (offset_right -= 1) {
+        // find next file
+        while (disk[@intCast(offset_right)] == null) {
+            offset_right -= 1;
+        }
+        var len: usize = 0;
+        const c = disk[@intCast(offset_right)];
+
+        while (offset_right >= 0 and disk[@intCast(offset_right)] == c) {
+            len += 1;
+            offset_right -= 1;
+        }
+        offset_right += 1;
+
+        // find free space
+        var offset_left: usize = 0;
+        while (offset_left < offset_right) : (offset_left += 1) {
+            if (disk[offset_left] == null) {
+                var free_len: usize = 1;
+                while (disk[offset_left + free_len] == null and free_len < len) : (free_len += 1) {}
+
+                if (len == free_len) {
+                    for (0..len) |i| {
+                        disk[offset_left + i] = disk[@as(usize, @intCast(offset_right)) + i];
+                        disk[@as(usize, @intCast(offset_right)) + i] = null;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    var result: result_type = 0;
+    for (disk, 0..) |item, i| {
+        if (item) |num| {
+            result += num * i;
+        }
+    }
+
+    return result;
 }
 
 pub fn main() !void {
@@ -99,5 +171,5 @@ test task_1 {
 }
 
 test task_2 {
-    // try std.testing.expectEqual(34, try task_2(std.testing.allocator, "data_test2.txt"));
+    try std.testing.expectEqual(2858, try task_2(std.testing.allocator, "data_test1.txt"));
 }
