@@ -71,9 +71,67 @@ fn task_1(allocator: std.mem.Allocator, file_name: []const u8) !?result_type {
 }
 
 fn task_2(allocator: std.mem.Allocator, file_name: []const u8) !?result_type {
-    _ = allocator;
-    _ = file_name;
-    return error.NotImplemented;
+    // open input
+    var file = try std.fs.cwd().openFile(file_name, .{});
+    defer file.close();
+    var input = std.io.bufferedReader(file.reader());
+
+    // read data
+    const data = try input.reader().readAllAlloc(allocator, 1 << 32);
+    defer allocator.free(data);
+
+    const line_length = std.mem.indexOf(u8, data, "\n").?;
+
+    var lines = std.ArrayList([:'\n']u8).init(allocator);
+    defer lines.deinit();
+
+    var i: usize = 0;
+    while (i < data.len) {
+        try lines.append(data[i .. i + line_length :'\n']);
+        i += line_length + 1;
+    }
+
+    // loop over data
+    const PointList = std.ArrayList(Point);
+    var old_positions = PointList.init(allocator);
+    defer old_positions.deinit();
+    var new_positions = PointList.init(allocator);
+    defer new_positions.deinit();
+
+    var result: result_type = 0;
+
+    for (lines.items, 0..) |line, y_head| {
+        for (line, 0..) |c_head, x_head| {
+            if (c_head != '0')
+                continue;
+
+            old_positions.clearRetainingCapacity();
+            try old_positions.append(.{ .y = y_head, .x = x_head });
+
+            for (1..10) |level| {
+                new_positions.clearRetainingCapacity();
+                for (old_positions.items) |pos| {
+                    if (pos.y > 0 and lines.items[pos.y - 1][pos.x] == level + '0')
+                        try new_positions.append(.{ .y = pos.y - 1, .x = pos.x });
+
+                    if (pos.x > 0 and lines.items[pos.y][pos.x - 1] == level + '0')
+                        try new_positions.append(.{ .y = pos.y, .x = pos.x - 1 });
+
+                    if (pos.y < lines.items.len - 1 and lines.items[pos.y + 1][pos.x] == level + '0')
+                        try new_positions.append(.{ .y = pos.y + 1, .x = pos.x });
+
+                    if (pos.x < line_length - 1 and lines.items[pos.y][pos.x + 1] == level + '0')
+                        try new_positions.append(.{ .y = pos.y, .x = pos.x + 1 });
+                }
+
+                std.mem.swap(PointList, &old_positions, &new_positions);
+            }
+
+            result += old_positions.items.len;
+        }
+    }
+
+    return result;
 }
 
 pub fn main() !void {
@@ -104,5 +162,5 @@ test task_1 {
 }
 
 test task_2 {
-    // try std.testing.expectEqual(2858, try task_2(std.testing.allocator, "data_test1.txt"));
+    try std.testing.expectEqual(81, try task_2(std.testing.allocator, "data_test1.txt"));
 }
