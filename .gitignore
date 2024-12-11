@@ -9,5 +9,10 @@ data.txt
 .zig-cache/
 zig-out/
 
+# rust
+target/
+
 # python
 .idea/
+venv/
+
