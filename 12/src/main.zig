@@ -102,10 +102,141 @@ fn task_1(allocator: std.mem.Allocator, file_name: []const u8) !?result_type {
     return result;
 }
 
+const Direction = enum { top, right, bottom, left };
+const Point = struct { y: usize, x: usize, d: Direction };
+const PointSet = std.AutoArrayHashMap(Point, void);
+
+fn count_pos_2(lines: *LineList, perimeter: *PointSet, y: usize, x: usize) !result_type {
+    const c = lines.items[y][x];
+
+    lines.items[y][x] |= 0x20;
+
+    var area: result_type = 1;
+
+    if (y == 0) {
+        try perimeter.put(.{ .y = y, .x = x, .d = .top }, {});
+    } else if (lines.items[y - 1][x] == c) {
+        area += try count_pos_2(lines, perimeter, y - 1, x);
+    } else if (lines.items[y - 1][x] == c | 0x20) {
+        // field of same region already processed
+    } else {
+        try perimeter.put(.{ .y = y, .x = x, .d = .top }, {});
+    }
+
+    if (x == 0) {
+        try perimeter.put(.{ .y = y, .x = x, .d = .left }, {});
+    } else if (lines.items[y][x - 1] == c) {
+        area += try count_pos_2(lines, perimeter, y, x - 1);
+    } else if (lines.items[y][x - 1] == c | 0x20) {
+        // field of same region already processed
+    } else {
+        try perimeter.put(.{ .y = y, .x = x, .d = .left }, {});
+    }
+
+    if (y == lines.items.len - 1) {
+        try perimeter.put(.{ .y = y, .x = x, .d = .bottom }, {});
+    } else if (lines.items[y + 1][x] == c) {
+        area += try count_pos_2(lines, perimeter, y + 1, x);
+    } else if (lines.items[y + 1][x] == c | 0x20) {
+        // field of same region already processed
+    } else {
+        try perimeter.put(.{ .y = y, .x = x, .d = .bottom }, {});
+    }
+
+    if (x == lines.items[0].len - 1) {
+        try perimeter.put(.{ .y = y, .x = x, .d = .right }, {});
+    } else if (lines.items[y][x + 1] == c) {
+        area += try count_pos_2(lines, perimeter, y, x + 1);
+    } else if (lines.items[y][x + 1] == c | 0x20) {
+        // field of same region already processed
+    } else {
+        try perimeter.put(.{ .y = y, .x = x, .d = .right }, {});
+    }
+
+    return area;
+}
+
+fn lessThatFn(ctx: void, lhs: Point, rhs: Point) bool {
+    _ = ctx;
+
+    if (lhs.d != rhs.d) {
+        return @intFromEnum(lhs.d) < @intFromEnum(rhs.d);
+    }
+
+    if (lhs.d == .top or lhs.d == .bottom) {
+        if (lhs.y != rhs.y) {
+            return lhs.y < rhs.y;
+        }
+        return lhs.x < rhs.x;
+    }
+
+    if (lhs.x != rhs.x) {
+        return lhs.x < rhs.x;
+    }
+    return lhs.y < rhs.y;
+}
+
 fn task_2(allocator: std.mem.Allocator, file_name: []const u8) !?result_type {
-    _ = allocator;
-    _ = file_name;
-    return error.NotImplemented;
+    // open input
+    var file = try std.fs.cwd().openFile(file_name, .{});
+    defer file.close();
+    var input = std.io.bufferedReader(file.reader());
+
+    // read data
+    const data = try input.reader().readAllAlloc(allocator, 1 << 32);
+    defer allocator.free(data);
+
+    const line_length = std.mem.indexOf(u8, data, "\n").?;
+
+    var lines = LineList.init(allocator);
+    defer lines.deinit();
+
+    var i: usize = 0;
+    while (i < data.len) {
+        try lines.append(data[i .. i + line_length :'\n']);
+        i += line_length + 1;
+    }
+
+    // loop over data
+    var result: result_type = 0;
+
+    var perimeter = PointSet.init(allocator);
+    defer perimeter.deinit();
+
+    for (lines.items, 0..) |line, y| {
+        for (line, 0..) |region_c, x| {
+            if (region_c & 0x20 != 0) {
+                continue;
+            }
+            perimeter.clearRetainingCapacity();
+            const area = try count_pos_2(&lines, &perimeter, y, x);
+
+            var sides: result_type = 0;
+            var last: ?Point = null;
+            std.mem.sortUnstable(Point, perimeter.keys(), {}, lessThatFn);
+            for (perimeter.keys()) |point| {
+                if (last == null or last.?.d != point.d) {
+                    sides += 1;
+                } else if (point.d == .top or point.d == .bottom) {
+                    if (last.?.y != point.y) {
+                        sides += 1;
+                    } else if (last.?.x + 1 != point.x) {
+                        sides += 1;
+                    }
+                } else {
+                    if (last.?.x != point.x) {
+                        sides += 1;
+                    } else if (last.?.y + 1 != point.y) {
+                        sides += 1;
+                    }
+                }
+                last = point;
+            }
+            result += area * sides;
+        }
+    }
+
+    return result;
 }
 
 pub fn main() !void {
@@ -138,5 +269,9 @@ test task_1 {
 }
 
 test task_2 {
-    // try std.testing.expectEqual(81, try task_2(std.testing.allocator, "data_test1.txt"));
+    try std.testing.expectEqual(80, try task_2(std.testing.allocator, "data_test1.txt"));
+    try std.testing.expectEqual(436, try task_2(std.testing.allocator, "data_test2.txt"));
+    try std.testing.expectEqual(1206, try task_2(std.testing.allocator, "data_test3.txt"));
+    try std.testing.expectEqual(236, try task_2(std.testing.allocator, "data_test4.txt"));
+    try std.testing.expectEqual(368, try task_2(std.testing.allocator, "data_test5.txt"));
 }
