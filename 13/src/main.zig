@@ -1,8 +1,8 @@
 const std = @import("std");
 
-const result_type = usize;
+const result_type = isize;
 
-fn task_1(allocator: std.mem.Allocator, file_name: []const u8) !?result_type {
+fn task(allocator: std.mem.Allocator, file_name: []const u8, prize_offset: result_type) !?result_type {
     _ = allocator;
 
     // open input
@@ -25,48 +25,23 @@ fn task_1(allocator: std.mem.Allocator, file_name: []const u8) !?result_type {
 
         const prize_line = (try input.reader().readUntilDelimiterOrEof(&buf, '\n')).?;
         var prize_iter = std.mem.tokenizeAny(u8, prize_line["Prize: X=".len..prize_line.len], ", Y=");
-        const prize_x = try std.fmt.parseInt(result_type, prize_iter.next().?, 10);
-        const prize_y = try std.fmt.parseInt(result_type, prize_iter.next().?, 10);
+        const prize_x = try std.fmt.parseInt(result_type, prize_iter.next().?, 10) + prize_offset;
+        const prize_y = try std.fmt.parseInt(result_type, prize_iter.next().?, 10) + prize_offset;
 
         // ignore next line
         _ = input.reader().readUntilDelimiterOrEof(&buf, '\n') catch {};
 
-        var min_cost: ?result_type = null;
-        for (0..101) |a_num| {
-            const a_x = a_num * a_diff_x;
+        const a: result_type = std.math.divExact(result_type, prize_y * b_diff_x - prize_x * b_diff_y, a_diff_y * b_diff_x - a_diff_x * b_diff_y) catch continue;
 
-            if (a_x > prize_x)
-                break;
+        const b: result_type = std.math.divExact(result_type, prize_x - a_diff_x * a, b_diff_x) catch continue;
 
-            if ((prize_x - a_x) % b_diff_x != 0)
-                continue;
-            const b_num = (prize_x - a_x) / b_diff_x;
+        try std.testing.expectEqual(prize_x, a * a_diff_x + b * b_diff_x);
+        try std.testing.expectEqual(prize_y, a * a_diff_y + b * b_diff_y);
 
-            if (a_diff_y * a_num + b_diff_y * b_num != prize_y) {
-                continue;
-            }
-
-            const cost = 3 * a_num + b_num;
-            if (min_cost) |old_cost| {
-                if (old_cost > cost)
-                    min_cost = cost;
-            } else {
-                min_cost = cost;
-            }
-        }
-
-        if (min_cost) |cost| {
-            result += cost;
-        }
+        result += 3 * a + b;
     }
 
     return result;
-}
-
-fn task_2(allocator: std.mem.Allocator, file_name: []const u8) !?result_type {
-    _ = allocator;
-    _ = file_name;
-    return error.NotImplemented;
 }
 
 pub fn main() !void {
@@ -84,16 +59,14 @@ pub fn main() !void {
     // execute
     var result: result_type = undefined;
     if (args.len < 2 or args[1][0] != '2') {
-        result = (try task_1(allocator, "data.txt")).?;
+        result = (try task(allocator, "data.txt", 0)).?;
     } else {
-        result = (try task_2(allocator, "data.txt")).?;
+        result = (try task(allocator, "data.txt", 10000000000000)).?;
     }
 
     try stdout.print("{d}\n", .{result});
 }
 
-test task_1 {
-    try std.testing.expectEqual(480, try task_1(std.testing.allocator, "data_test1.txt"));
+test task {
+    try std.testing.expectEqual(480, try task(std.testing.allocator, "data_test1.txt", 0));
 }
-
-test task_2 {}
