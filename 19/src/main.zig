@@ -12,7 +12,7 @@ const REGEX_T_ALIGNOF = 8;
 
 const RegexError = error{ InvalidExpression, MatchError };
 
-const result_type = u16;
+const result_type = u64;
 
 fn task_1(allocator: std.mem.Allocator, file_name: []const u8) !?result_type {
     // open input
@@ -54,8 +54,6 @@ fn task_1(allocator: std.mem.Allocator, file_name: []const u8) !?result_type {
         buf[line.len] = 0;
         const c_line: [:0]u8 = buf[0..line.len :0];
 
-        std.debug.print("{s}\n", .{line});
-
         // match expression
         if (regcomp(regex, regex_str.items[0 .. regex_str.items.len - 1 :0], re.REG_EXTENDED) != 0) {
             return RegexError.InvalidExpression;
@@ -72,10 +70,102 @@ fn task_1(allocator: std.mem.Allocator, file_name: []const u8) !?result_type {
     return result;
 }
 
+const Color = enum(u3) {
+    w = 0,
+    u = 1,
+    b = 2,
+    r = 3,
+    g = 4,
+
+    fn fromChar(char: u8) Color {
+        return switch (char) {
+            'w' => .w,
+            'u' => .u,
+            'b' => .b,
+            'r' => .r,
+            'g' => .g,
+            else => unreachable,
+        };
+    }
+};
+
+const Item = struct {
+    next: ?[]Item = null,
+    is_towl: bool = false,
+
+    fn deinit(self: Item, allocator: std.mem.Allocator) void {
+        if (self.next) |next| {
+            for (next) |item| {
+                item.deinit(allocator);
+            }
+            allocator.free(next);
+        }
+    }
+};
+
 fn task_2(allocator: std.mem.Allocator, file_name: []const u8) !?result_type {
-    _ = file_name; // autofix
-    _ = allocator; // autofix
-    return error.NotImplemented;
+    // open input
+    var file = try std.fs.cwd().openFile(file_name, .{});
+    defer file.close();
+    var input = std.io.bufferedReader(file.reader());
+
+    // read data
+    var towls = Item{};
+    defer towls.deinit(allocator);
+
+    var buf: [4096]u8 = undefined;
+    {
+        const line = (try input.reader().readUntilDelimiterOrEof(&buf, '\n')).?;
+        var iter = std.mem.tokenizeAny(u8, line, ", ");
+
+        while (iter.next()) |match| {
+            var curr = &towls;
+            for (match) |c| {
+                if (curr.next == null) {
+                    curr.next = try allocator.alloc(Item, 5);
+                    @memset(curr.next.?, Item{});
+                }
+                curr = &curr.next.?[@intCast(@intFromEnum(Color.fromChar(c)))];
+            }
+            curr.is_towl = true;
+        }
+    }
+
+    // calculate result
+    _ = try input.reader().readUntilDelimiterOrEof(&buf, '\n');
+
+    // offset => ways to get here
+    var possibilities = std.ArrayList(result_type).init(allocator);
+    defer possibilities.deinit();
+
+    var result: result_type = 0;
+    while (try input.reader().readUntilDelimiterOrEof(&buf, '\n')) |line| : (possibilities.clearRetainingCapacity()) {
+        try possibilities.resize(line.len + 1);
+        @memset(possibilities.items, 0);
+        possibilities.items[0] = 1;
+
+        for (0..line.len) |offset| {
+            var curr = &towls;
+
+            for (line[offset..line.len], 1..) |c, offset_2| {
+                const color = Color.fromChar(c);
+
+                if (curr.next) |next| {
+                    curr = &next[@intFromEnum(color)];
+
+                    if (curr.is_towl) {
+                        possibilities.items[offset + offset_2] += possibilities.items[offset];
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+
+        result += possibilities.items[line.len];
+    }
+
+    return result;
 }
 
 pub fn main() !void {
@@ -106,5 +196,5 @@ test task_1 {
 }
 
 test task_2 {
-    // try std.testing.expectEqual(48, try task_2(std.testing.allocator, "data_test2.txt"));
+    try std.testing.expectEqual(16, try task_2(std.testing.allocator, "data_test1.txt"));
 }
